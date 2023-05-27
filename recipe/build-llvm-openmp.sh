@@ -1,10 +1,6 @@
 #!/bin/bash
 set -ex
 
-env
-CFLAGS="$(echo ${CFLAGS} | sed 's/-march=armv7/-march=armv7-a/g')"
-CXXFLAGS="$(echo ${CXXFLAGS} | sed 's/-march=armv7/-march=armv7-a/g')"
-
 # using subproject sources has been effectively broken in LLVM 14,
 # so we use the entire project, but make sure we don't pick up
 # anything in-tree other than openmp & the shared cmake folder

@@ -42,15 +42,18 @@ fi
 if [[ "${PKG_VERSION}" == *rc* ]]; then
   export PKG_VERSION=${PKG_VERSION::${#PKG_VERSION}-4}
 fi
+# used in patch to construct path to libclang_rt.builtins
+export PKG_VERSION_MAJOR=$(echo ${PKG_VERSION} | cut -d "." -f1)
 
-cmake ${CMAKE_ARGS} \
+cmake -G Ninja \
+    ${CMAKE_ARGS} \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH=$PREFIX \
     ..
 
-make -j${CPU_COUNT} VERBOSE=1
-make install
+cmake --build .
+cmake --install .
 
 rm -f $PREFIX/lib/libgomp$SHLIB_EXT
 

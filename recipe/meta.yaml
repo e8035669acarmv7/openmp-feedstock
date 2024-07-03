@@ -1,4 +1,4 @@
-{% set version = "16.0.6" %}
+{% set version = "18.1.8" %}
 # check https://clang.llvm.org/docs/OpenMPSupport.html
 # occasionally to see last fully supported openmp ver.
 {% set openmp_ver = "4.5" %}
@@ -8,20 +8,25 @@ package:
   version: {{ version }}
 
 source:
-  url: https://github.com/llvm/llvm-project/releases/download/llvmorg-{{ version.replace(".rc", "-rc") }}/llvm-project-{{ version.replace(".rc", "rc") }}.src.tar.xz
-  sha256: ce5e71081d17ce9e86d7cbcfa28c4b04b9300f8fb7e78422b1feb6bc52c3028e
+  url: https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-{{ version.replace(".rc", "-rc") }}.tar.gz
+  sha256: 09c08693a9afd6236f27a2ebae62cda656eba19021ef3f94d59e931d662d4856
   # name folder for easier deletion; we do the equivalent of downloading
   # the subproject sources, so the work folder then has openmp in it;
   # for details see build scripts
   folder: llvm-project
+  patches:
+    # backport https://github.com/llvm/llvm-project/pull/80174
+    - patches/0001-openmp-On-Windows-fix-standalone-cmake-build.patch
+    # intermediate fix for https://github.com/llvm/llvm-project/issues/54596
+    - patches/0002-link-libomp-to-compiler-rt-on-osx-arm.patch
 
 build:
   number: 0
 
 outputs:
   - name: llvm-openmp
-    script: build-llvm-openmp.sh  # [not win]
-    script: bld-llvm-openmp.bat  # [win]
+    script: build-pkg.sh   # [unix]
+    script: build-pkg.bat  # [win]
     build:
       ignore_run_exports:
         - libgcc-ng
@@ -35,34 +40,42 @@ outputs:
     requirements:
       build:
         - {{ compiler('cxx') }}
+        - {{ stdlib("c") }}
         - clang  # [win]
         - cmake
-        - make   # [unix]
+        - ninja
         - perl
-        - ninja  # [win]
       host:
         - llvmdev {{ version }}|{{ version }}.*
         - zlib   # [linux]
         - zstd   # [linux]
+        # see https://github.com/llvm/llvm-project/issues/54596
+        - compiler-rt  # [osx and arm64]
       run_constrained:
         - openmp {{ version }}|{{ version }}.*
     test:
       requires:
         - clangxx
         - {{ compiler('cxx') }}
+      files:
+        - omp_hello.c
       commands:
-        - if not exist %LIBRARY_BIN%\\libomp.dll exit 1   # [win]
+        # headers
+        - test -f $PREFIX/include/omp.h                   # [unix]
+        - if not exist %LIBRARY_INC%\omp.h exit 1         # [win]
+
+        # shared library
         - test -f $PREFIX/lib/libomp.so                   # [linux]
         - test -f $PREFIX/lib/libomp.dylib                # [osx]
-        - if not exist %LIBRARY_LIB%\\libomp.lib exit 1   # [win]
-        - if not exist %LIBRARY_INC%\\omp.h exit 1        # [win]
-        - test -f $PREFIX/include/omp.h                   # [unix]
-        - $PREFIX/bin/clang -v -fopenmp -I$PREFIX/include -L$PREFIX/lib -Wl,-rpath,$PREFIX/lib omp_hello.c -o omp_hello  # [not win]
+        - if not exist %LIBRARY_BIN%\libomp.dll exit 1    # [win]
+        - if not exist %LIBRARY_LIB%\libomp.lib exit 1    # [win]
+
+        # compilation test
+        - export LNK_XTRA="-Wl,--allow-shlib-undefined"   # [linux]
+        - $PREFIX/bin/clang -v -fopenmp -I$PREFIX/include -L$PREFIX/lib -Wl,-rpath,$PREFIX/lib $LNK_XTRA omp_hello.c -o omp_hello  # [unix]
         - '%LIBRARY_BIN%\clang -v -fopenmp -I%LIBRARY_INC% -L%LIBRARY_LIB% omp_hello.c -o omp_hello.exe'   # [win]
         - ./omp_hello            # [unix]
         - '%cd%\omp_hello.exe'   # [win]
-      files:
-        - omp_hello.c
 
 about:
   home: http://openmp.llvm.org/

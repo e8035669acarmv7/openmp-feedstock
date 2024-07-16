@@ -50,6 +50,8 @@ cmake -G Ninja \
     -DCMAKE_INSTALL_PREFIX=$PREFIX \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH=$PREFIX \
+    -DCMAKE_ASM_FLAGS="${CFLAGS} -x assembler-with-cpp" \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
     ..
 
 cmake --build .
@@ -60,7 +62,7 @@ rm -f $PREFIX/lib/libgomp$SHLIB_EXT
 mkdir -p $PREFIX/lib/clang/$PKG_VERSION/include
 # Standalone libomp build doesn't put omp.h in clang's default search path
 cp $PREFIX/include/omp.h $PREFIX/lib/clang/$PKG_VERSION/include
-# if [[ "$target_platform" == linux-* ]]; then
+if [[ "$target_platform" == linux-* ]]; then
   # move libarcher.so so that it doesn't interfere
-#   mv $PREFIX/lib/libarcher.so $PREFIX/lib/libarcher.so.bak
-# fi
+  mv $PREFIX/lib/libarcher.so $PREFIX/lib/libarcher.so.bak || true
+fi
